@@ -2,11 +2,10 @@
   "name": "random-images",
   "version": "1.0.0",
   "private": false,
-  "main": "src/index.js",
+  "main": "src/index.ts",
   "scripts": {
     "dev": "wrangler dev",
-    "wrangler:dev": "wrangler dev",
-    "wrangler:publish": "wrangler publish"
+    "publish": "wrangler publish"
   },
   "engines": {
     "node": "24.x"
