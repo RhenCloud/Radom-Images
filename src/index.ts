@@ -1,13 +1,13 @@
 export default {
   async fetch(request: Request, env: any) {
     const url = new URL(request.url);
-    const pathname = url.pathname.replace(/\/+$/, '');
+    const pathname = url.pathname.replace(/\/+$/, "");
 
     // CORS preflight
-    if (request.method === 'OPTIONS') {
+    if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
-        headers: corsHeaders()
+        headers: corsHeaders(),
       });
     }
 
@@ -15,77 +15,81 @@ export default {
     await ensureTable(env);
 
     try {
-      if (pathname === '/api/images' && request.method === 'GET') {
+      if (pathname === "/api/images" && request.method === "GET") {
         return await listImages(request, env);
       }
 
-      // GET random image
-      if ((pathname === '/api/images/random' || pathname === '/api/random') && request.method === 'GET') {
+      // GET random image (supports ?category=... and ?raw)
+      if ((pathname === "/api/images/random" || pathname === "/api/random") && request.method === "GET") {
         const qurl = new URL(request.url);
-        const category = qurl.searchParams.get('category');
-        const raw = qurl.searchParams.get('raw');
-        if (raw) {
-          const res = await env.DB.prepare('SELECT * FROM images ORDER BY RANDOM() LIMIT 1').all();
-          const item = (res && res.results && res.results[0]) ? res.results[0] : null;
-          return new Response(JSON.stringify(item), { status: 200, headers: jsonHeaders() });
-        }
-        let stmt = 'SELECT id, category, url, created_at FROM images';
+        const category = qurl.searchParams.get("category");
+        const raw = qurl.searchParams.has("raw");
+        let stmt = "SELECT id, category, url, created_at FROM images";
+        let res;
         if (category) {
-          stmt += ' WHERE category = ? ORDER BY RANDOM() LIMIT 1';
-          const res = await env.DB.prepare(stmt).bind(category).all();
-          const item = (res && res.results && res.results[0]) ? res.results[0] : null;
-          return new Response(JSON.stringify(item), { status: 200, headers: jsonHeaders() });
+          stmt += " WHERE category = ? ORDER BY RANDOM() LIMIT 1";
+          res = await env.DB.prepare(stmt).bind(category).all();
+        } else {
+          stmt += " ORDER BY RANDOM() LIMIT 1";
+          res = await env.DB.prepare(stmt).all();
         }
-        stmt += ' ORDER BY RANDOM() LIMIT 1';
-        const res = await env.DB.prepare(stmt).all();
-        const item = (res && res.results && res.results[0]) ? res.results[0] : null;
+        const item = res && res.results && res.results[0] ? res.results[0] : null;
+        if (raw) {
+          if (!item || !item.url) return new Response("Not found", { status: 404 });
+          try {
+            const proxied = await fetch(item.url);
+            return proxied;
+          } catch (e) {
+            return new Response("Failed to fetch image", { status: 502 });
+          }
+        }
         return new Response(JSON.stringify(item), { status: 200, headers: jsonHeaders() });
       }
 
-      if (pathname === '/api/images' && request.method === 'POST') {
+      if (pathname === "/api/images" && request.method === "POST") {
         return await addImage(request, env);
       }
 
       // DELETE /api/images/:id
       const delMatch = pathname.match(/^\/api\/images\/(\d+)$/);
-      if (delMatch && request.method === 'DELETE') {
+      if (delMatch && request.method === "DELETE") {
         const id = Number(delMatch[1]);
         return await deleteImage(id, request, env);
       }
 
       // serve index.html for root
-      if ((pathname === '' || pathname === '/') && request.method === 'GET') {
+      if ((pathname === "" || pathname === "/") && request.method === "GET") {
         return await serveIndex(request);
       }
 
-      return new Response(JSON.stringify({ error: 'Not found' }), {
+      return new Response(JSON.stringify({ error: "Not found" }), {
         status: 404,
-        headers: jsonHeaders()
+        headers: jsonHeaders(),
       });
     } catch (err: any) {
       return new Response(JSON.stringify({ error: err?.message || String(err) }), {
         status: 500,
-        headers: jsonHeaders()
+        headers: jsonHeaders(),
       });
     }
-  }
+  },
 };
 
 function corsHeaders() {
   return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS'
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
   } as Record<string, string>;
 }
 
 function jsonHeaders() {
-  return Object.assign({ 'Content-Type': 'application/json; charset=utf-8' }, corsHeaders());
+  return Object.assign({ "Content-Type": "application/json; charset=utf-8" }, corsHeaders());
 }
 
 async function listImages(request: Request, env: any) {
   const url = new URL(request.url);
-  const category = url.searchParams.get('category');
+  const category = url.searchParams.get("category");
   let stmt: string;
   if (category) {
     stmt = `SELECT id, category, url, created_at FROM images WHERE category = ? ORDER BY created_at DESC`;
@@ -102,14 +106,14 @@ async function addImage(request: Request, env: any) {
   // auth
   const ok = await checkAuth(request, env);
   if (!ok) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: jsonHeaders() });
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: jsonHeaders() });
   }
 
   const body = await request.json();
-  const category = (body.category || 'default').trim();
-  const url = (body.url || '').trim();
+  const category = (body.category || "default").trim();
+  const url = (body.url || "").trim();
   if (!url) {
-    return new Response(JSON.stringify({ error: 'url required' }), { status: 400, headers: jsonHeaders() });
+    return new Response(JSON.stringify({ error: "url required" }), { status: 400, headers: jsonHeaders() });
   }
 
   const created_at = new Date().toISOString();
@@ -122,7 +126,7 @@ async function addImage(request: Request, env: any) {
 async function deleteImage(id: number, request: Request, env: any) {
   const ok = await checkAuth(request, env);
   if (!ok) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: jsonHeaders() });
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: jsonHeaders() });
   }
 
   const stmt = `DELETE FROM images WHERE id = ?`;
@@ -132,18 +136,18 @@ async function deleteImage(id: number, request: Request, env: any) {
 
 async function checkAuth(request: Request, env: any) {
   // Accept: Authorization: Bearer <token>
-  const auth = request.headers.get('Authorization') || '';
+  const auth = request.headers.get("Authorization") || "";
   let token: string | null = null;
-  if (auth.startsWith('Bearer ')) token = auth.slice(7).trim();
+  if (auth.startsWith("Bearer ")) token = auth.slice(7).trim();
 
   // or ?token= in URL
   if (!token) {
     const url = new URL(request.url);
-    token = url.searchParams.get('token');
+    token = url.searchParams.get("token");
   }
 
   // or token in JSON body
-  if (!token && request.method !== 'GET') {
+  if (!token && request.method !== "GET") {
     try {
       const body = await request.clone().json();
       if (body && body.token) token = body.token;
@@ -159,7 +163,7 @@ async function checkAuth(request: Request, env: any) {
 
 async function serveIndex(request: Request) {
   const html = await getIndexHtml();
-  return new Response(html, { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+  return new Response(html, { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
 }
 
 function getIndexHtml() {
