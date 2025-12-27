@@ -11,6 +11,9 @@ export default {
       });
     }
 
+    // Ensure the images table exists before handling requests
+    await ensureTable(env);
+
     try {
       if (pathname === '/api/images' && request.method === 'GET') {
         return await listImages(request, env);
@@ -55,6 +58,26 @@ function corsHeaders() {
 
 function jsonHeaders() {
   return Object.assign({ 'Content-Type': 'application/json; charset=utf-8' }, corsHeaders());
+}
+
+// Ensure the `images` table exists. If missing, create it.
+async function ensureTable(env) {
+  if (!env || !env.DB) return;
+  try {
+    const check = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='images'").all();
+    if (!check || !check.results || check.results.length === 0) {
+      const stmt = `CREATE TABLE IF NOT EXISTS images (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        category TEXT NOT NULL DEFAULT 'default',
+        url TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )`;
+      await env.DB.prepare(stmt).run();
+    }
+  } catch (e) {
+    // ignore — failure to check/create shouldn't crash the worker at startup
+    // (errors will surface later when DB is used)
+  }
 }
 
 async function listImages(request, env) {
