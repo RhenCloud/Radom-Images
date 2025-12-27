@@ -23,6 +23,12 @@ export default {
       if ((pathname === '/api/images/random' || pathname === '/api/random') && request.method === 'GET') {
         const qurl = new URL(request.url);
         const category = qurl.searchParams.get('category');
+        const raw = qurl.searchParams.get('raw');
+        if (raw) {
+          const res = await env.DB.prepare('SELECT * FROM images ORDER BY RANDOM() LIMIT 1').all();
+          const item = (res && res.results && res.results[0]) ? res.results[0] : null;
+          return new Response(JSON.stringify(item), { status: 200, headers: jsonHeaders() });
+        }
         let stmt = 'SELECT id, category, url, created_at FROM images';
         if (category) {
           stmt += ' WHERE category = ? ORDER BY RANDOM() LIMIT 1';
