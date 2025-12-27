@@ -1,0 +1,8 @@
+name = "random-images"
+main = "src/index.js"
+compatibility_date = "2025-12-27"
+# `type` removed: some wrangler versions reject this property
+workers_dev = true
+
+# 绑定 D1 数据库，部署前请在此处填写对应的 database_name 或在 Vercel/Cloudflare 控制台创建并绑定
+d1_databases = [{ binding = "DB", database_name = "RANDOM_IMAGES_DB" }]

@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS images (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL DEFAULT 'default',
+    url TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
